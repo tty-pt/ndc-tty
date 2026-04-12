@@ -1,0 +1,7 @@
+*.o
+*.so
+/htdocs
+/types
+/cjs
+/esm
+/node_modules
