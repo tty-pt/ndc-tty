@@ -20,6 +20,7 @@
 .xterm-fg-4, .xterm-bg-4 { color: #00e0c4; }
 .xterm-fg-5, .xterm-bg-5 { color: #73fa91; }
 
+html, body { height: 100%; }
 .margin-0 {margin: 0;}
 .size-vertical {height: 100%;}
 .size-vertical-view {height: 100vh;}

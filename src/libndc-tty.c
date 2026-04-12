@@ -31,6 +31,16 @@
 #include <termios.h>
 #include <unistd.h>
 
+/* Explicit declarations for functions hidden by _XOPEN_SOURCE */
+#ifdef __APPLE__
+int setgroups(int, const gid_t *);
+int initgroups(const char *, int);
+#endif
+#ifdef __OpenBSD__
+int setgroups(int, const gid_t *);
+int initgroups(const char *, gid_t);
+#endif
+
 #ifndef NDC_PREFIX
 #define NDC_PREFIX "/usr/local"
 #endif
@@ -49,8 +59,9 @@
 /* ------------------------------------------------------------------ */
 
 struct mux_state {
-  int            pty;  /* PTY master fd; -1 = none */
-  int            pid;  /* child PID; -1 = none */
+  int            pty;        /* PTY master fd; -1 = none */
+  int            pid;        /* child PID; -1 = none */
+  int            auto_shell; /* spawn shell on first NAWS */
   struct winsize wsz;
   struct termios tty;
 };
@@ -112,15 +123,13 @@ ndc_tty_update(socket_t fd)
     return;
 
   struct termios last = s->tty;
+  tcgetattr(s->pty, &s->tty);
 
   if ((last.c_lflag & ECHO) != (s->tty.c_lflag & ECHO))
     TELNET_CMD(fd, IAC, s->tty.c_lflag & ECHO ? WILL : WONT, TELOPT_ECHO);
 
   if ((last.c_lflag & ICANON) != (s->tty.c_lflag & ICANON))
     TELNET_CMD(fd, IAC, s->tty.c_lflag & ICANON ? WONT : WILL, TELOPT_SGA);
-
-  tcgetattr(s->pty, &s->tty);
-  tcflush(s->pty, TCIFLUSH);
 }
 
 static struct passwd *
@@ -214,6 +223,8 @@ command_pty(socket_t cfd, struct winsize *ws, char * const args[])
     char * const env[] = {
       "PATH=/bin:/usr/bin:/usr/local/bin",
       "LD_LIBRARY_PATH=/lib:/usr/lib:/usr/local/lib",
+      "TERM=xterm-256color",
+      "COLORTERM=truecolor",
       home, user, shell,
       NULL,
     };
@@ -265,13 +276,6 @@ NDX_DEF(int, on_ndc_connect, socket_t, fd)
   TELNET_CMD(fd, IAC, WONT, TELOPT_SGA);
   TELNET_CMD(fd, IAC, DO, TELOPT_NAWS);
 
-  s.tty.c_lflag = ICANON | ECHO | ECHOK | ECHOCTL;
-  s.tty.c_iflag = IGNCR;
-  s.tty.c_iflag &= ~ICRNL;
-  s.tty.c_iflag &= ~INLCR;
-  s.tty.c_oflag |= OPOST | ONLCR;
-  s.tty.c_oflag &= ~OCRNL;
-
   CBUG(fcntl(fd, F_SETFL, O_NONBLOCK) == -1,
       "telnet_connected fcntl F_SETFL O_NONBLOCK\n");
 
@@ -279,6 +283,13 @@ NDX_DEF(int, on_ndc_connect, socket_t, fd)
   CBUG(s.pty == -1,  "telnet_connected posix_openpt\n");
   CBUG(grantpt(s.pty),  "telnet_connected grantpt\n");
   CBUG(unlockpt(s.pty), "telnet_connected unlockpt\n");
+
+  /* Start from OS defaults, then adjust only CR/LF translation */
+  tcgetattr(s.pty, &s.tty);
+  s.tty.c_iflag |= ICRNL;
+  s.tty.c_iflag &= ~(IGNCR | INLCR);
+  s.tty.c_oflag |= OPOST | ONLCR;
+  s.tty.c_oflag &= ~OCRNL;
 
   struct mux_state *sp = mux_put(fd, &s);
 
@@ -292,11 +303,11 @@ NDX_DEF(int, on_ndc_connect, socket_t, fd)
   if (sp->wsz.ws_col || sp->wsz.ws_row)
     ioctl(sp->pty, TIOCSWINSZ, &sp->wsz);
 
-  /* Auto-spawn a shell when the WebSocket connects via /tty */
+  /* Auto-spawn a shell on first NAWS when connected via /tty */
   char doc_uri[BUFSIZ] = "";
   ndc_env_get(fd, doc_uri, "DOCUMENT_URI");
   if (strcmp(doc_uri, "/tty") == 0)
-    call_ndc_tty_shell(fd);
+    sp->auto_shell = 1;
 
   return 0;
 }
@@ -332,6 +343,12 @@ NDX_DEF(int, on_ndc_parse,
         ioctl(s->pty, TIOCSWINSZ, &s->wsz);
 
       i += 9;
+
+      /* First NAWS received — spawn shell now that dimensions are set */
+      if (s->auto_shell && s->pid == -1) {
+        s->auto_shell = 0;
+        call_ndc_tty_shell(fd);
+      }
     } else if (input[i + 1] == DO && input[i + 2] == TELOPT_SGA) {
       i += 3;
     } else if (input[i + 1] == DO) {

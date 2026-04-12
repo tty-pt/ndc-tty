@@ -25,7 +25,6 @@ function create(element, options = {}) {
   const fitAddon = new FitAddon();
   const resizeObserver = new ResizeObserver(() => fitAddon.fit());
   const term = new globalThis.Terminal({
-    convertEol: true,
     fontSize: 13,
     fontFamily: 'Consolas,Liberation Mono,Menlo,Courier,monospace',
     allowProposedApi: true,
@@ -139,9 +138,9 @@ function create(element, options = {}) {
       if (options.debug)
         console.log("term.onData", data, data.charAt(0), raw, will_echo);
       if (raw)
-        send(data === "\r" ? "\r\n" : data);
+        send(data);
       else if (data === "\r" || data === "\n") {
-        if (will_echo)
+        if (!will_echo)
           term.write("\b \b".repeat(term.inputBuf.length));
         else
           term.write("\n");
@@ -156,7 +155,7 @@ function create(element, options = {}) {
         }
       } else {
         term.inputBuf += data;
-        if (will_echo)
+        if (!will_echo)
           term.write(data);
         return;
       }
@@ -173,7 +172,7 @@ function create(element, options = {}) {
 
     ws.onopen = () => {
       connected = true;
-      resize(sub.cols, sub.rows);
+      resize(term.cols, term.rows);
       sub.onOpen(term, ws);
     };
 

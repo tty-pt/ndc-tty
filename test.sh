@@ -10,7 +10,7 @@ port=$((20000 + RANDOM % 8000))
 tmpout=$(mktemp)
 trap 'rm -f "$tmpout"; kill "$mux_pid" 2>/dev/null; wait "$mux_pid" 2>/dev/null || true' EXIT
 
-ndc -d -A -p "$port" -m ./lib/libndc-tty >/dev/null 2>&1 &
+ndc -d -A -p "$port" -m ./lib/ndc-tty >/dev/null 2>&1 &
 mux_pid=$!
 
 # WS key and expected accept

@@ -9,7 +9,7 @@ jobs:
   build:
     uses: tty-pt/ci/.github/workflows/all-in-one.yml@main
     with:
-      name: libndc-mux
+      name: ndc-tty
       deps: "libndc,libndx"
       publish_to: "deb,apk,rpm,brew,openbsd"
     secrets:
