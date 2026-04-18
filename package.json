@@ -32,10 +32,7 @@
     "ndc": "./ndc-cli.js"
   },
   "scripts": {
-    "test": "scripts test",
     "build": "scripts build",
-    "watch": "scripts watch",
-    "lint": "scripts lint",
     "postinstall": "make"
   },
   "repository": {
@@ -49,10 +46,10 @@
   },
   "homepage": "https://tty.pt",
   "devDependencies": {
-    "@tty-pt/scripts": "^0.7.2",
-    "@xterm/addon-fit": "^0.10.0",
-    "@xterm/addon-web-links": "^0.11.0",
-    "@xterm/xterm": "^5.5.0",
+    "@tty-pt/scripts": "^0.8.0",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-web-links": "^0.12.0",
+    "@xterm/xterm": "^6.0.0",
     "lodash": "^4.17.21"
   },
   "peerDependencies": {

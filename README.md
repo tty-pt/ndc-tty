@@ -1,5 +1,7 @@
 # ndc-tty
-> WebSocket PTY multiplexer module for libndc
+> WebSocket PTY bridge module for libndc
+
+<img src="https://github.com/tty-pt/ndc-tty/blob/main/usage.gif?raw=true" width="512" />
 
 A dynamic module for [ndc](https://github.com/tty-pt/ndc) that adds:
 
@@ -68,12 +70,35 @@ See `types/ndc.d.ts` for full TypeScript definitions.
 #include <ttypt/ndc-tty.h>
 
 // Spawn login shell on a WebSocket connection
-call_ndc_mux_shell(fd);
+call_ndc_tty_shell(fd);
 
 // Spawn specific command
 char *argv[] = { "/bin/bash", NULL };
-call_ndc_mux_exec(fd, argv);
+call_ndc_tty_exec(fd, argv);
 ```
+
+### WebSocket upgrade
+
+ndc does **not** auto-upgrade WebSocket requests. Modules must opt in
+explicitly. ndc-tty registers a `GET:/tty` handler that detects the upgrade
+and calls `ndc_ws_upgrade(fd)`:
+
+```c
+static int
+handle_tty(socket_t fd, char *body)
+{
+    char key[ENV_VALUE_LEN] = {0};
+    if (ndc_env_get(fd, key, "HTTP_SEC_WEBSOCKET_KEY") == 0) {
+        ndc_ws_upgrade(fd);  /* performs handshake, calls ndc_connect() */
+        return 0;
+    }
+    serve_htdocs(fd, "index.html");
+    return 0;
+}
+```
+
+After `ndc_ws_upgrade` succeeds, `ndc_connect()` fires — ndc-tty's
+`on_ndc_connect` handler sets up the PTY and Telnet negotiation.
 
 ## Building
 

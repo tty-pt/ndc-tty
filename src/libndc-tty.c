@@ -480,6 +480,11 @@ static int
 handle_tty(socket_t fd, char *body)
 {
   (void)body;
+  char key[ENV_VALUE_LEN] = {0};
+  if (ndc_env_get(fd, key, "HTTP_SEC_WEBSOCKET_KEY") == 0) {
+    ndc_ws_upgrade(fd);
+    return 0;
+  }
   serve_htdocs(fd, "index.html");
   return 0;
 }
